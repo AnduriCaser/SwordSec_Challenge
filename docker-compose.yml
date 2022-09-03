@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  redis:
+    container_name: redis
+    restart: always 
+    image: redis
+    command: "redis-server"
+    ports:
+      - 6379:6379
+
+  db:
+    container_name: db
+    image: postgres:13.4-alpine
+    restart: always
+    ports:
+      - 8001:5432
+    environment:
+      - "POSTGRES_USER=test"
+      - "POSTGRES_PASSWORD=123456"
+      - "POSTGRES_DB=swordsec_challenge"
+      - "POSTGRES_HOST_AUTH_METHOD=trust"
+
+  worker:
+    build:
+      context: web
+      dockerfile: docker/worker/Dockerfile
+    links:
+      - redis:redis
+    depends_on:
+      - redis
+      - app
+      - sender
+    volumes:
+      - ./web:/worker
+  
+
+  app:
+    build:
+      context: web
+      dockerfile: docker/app/Dockerfile
+    ports:
+      - 8000:8000
+    links:
+      - db:db
+      - redis:redis
+    depends_on:
+      - db
+      - redis
+    
+
+  sender:
+    build:
+      context: web
+      dockerfile: docker/send/Dockerfile
+    links:
+      - app:app
+    depends_on:
+      - app
+
+
+  consume:
+    build:
+      context: web
+      dockerfile: docker/consume/Dockerfile
+    links:
+      - redis:redis
+    depends_on:
+      - redis
+      - worker
+
